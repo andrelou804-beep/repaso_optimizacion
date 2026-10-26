@@ -1,0 +1,67 @@
+create database practica_indices;
+
+use practica_indices;
+
+CREATE TABLE cliente (
+cliente_id INT AUTO_INCREMENT PRIMARY KEY,
+nombre VARCHAR(60) NOT NULL,
+apellido VARCHAR(60) NOT NULL,
+correo VARCHAR(120) NOT NULL,
+ciudad VARCHAR(60) NOT NULL,
+fecha_registro DATE NOT NULL,
+activo TINYINT NOT NULL DEFAULT 1
+);
+
+INSERT INTO cliente
+(nombre, apellido, correo, ciudad, fecha_registro, activo)
+VALUES
+('Ana', 'Gómez', 'ana.gomez@ejemplo.com', 'Manizales', '2025-01-10', 1),
+('Luis', 'Pérez', 'luis.perez@ejemplo.com', 'Pereira', '2025-02-15', 1),
+('Sara', 'López', 'sara.lopez@ejemplo.com', 'Manizales', '2025-03-20', 1),
+('Juan', 'Rojas', 'juan.rojas@ejemplo.com', 'Armenia', '2025-04-05', 0),
+('Marta', 'Díaz', 'marta.diaz@ejemplo.com', 'Pereira', '2025-05-12', 1),
+('Diego', 'Vargas', 'diego.vargas@ejemplo.com', 'Manizales', '2025-06-18', 1),
+('Paula', 'Ruiz', 'paula.ruiz@ejemplo.com', 'Armenia', '2025-07-02', 0),
+('Carlos', 'Mora', 'carlos.mora@ejemplo.com', 'Pereira', '2025-08-23', 1);
+
+
+-- EJERCICIO TALLER FINAL PUNTO 10
+create index idx_cliente_activo_Nombre on cliente (activo, nombre);
+
+explain select cliente_id, nombre, activo from cliente where activo = 1;
+
+create index idx_fecha_registro on cliente (fecha_registro);
+
+explain select fecha_registro from cliente where fecha_registro>= '2025-03-01' and fecha_registro<= '2025-07-01';  --  1|SIMPLE     |cliente|          |range|idx_fecha_registro|idx_fecha_registro|3      |   |   4|   100.0|Using where; Using index
+
+create index idx_cliente_ciudad_activo on cliente (ciudad, activo); -- Este orden es ideal porque va de lo más selectivo (filtrar entre decenas o cientos de ciudades) a lo menos selectivo (filtrar entre 2 estados: activo/inactivo).
+
+-- deja de ser efectivo cuando solo se hace la busqueda por activo ya que ahí no lo acepta por si solo el indice compuesto porque va despues de ciudad.
+
+select cliente_id, ciudad, activo from cliente where ciudad = 'manizales' and activo = 1;
+
+1|SIMPLE     |cliente|          |ref |idx_cliente_ciudad_activo|idx_cliente_ciudad_activo|243    |const,const|   3|   100.0|Using index
+
+1	Manizales	1
+3	Manizales	1
+6	Manizales	1
+
+-- Ventaja (Lectura más rápida): Acelera drásticamente la ejecución de consultas SELECT con filtros (WHERE), uniones (JOIN) y ordenamientos (ORDER BY), permitiendo a la base de datos encontrar registros mediante una búsqueda en árbol sin tener que leer la tabla completa (Full Table Scan).
+-- el costo seria la escritura mas lenta , ya que cada que se agregan registros nuevos la base de datos tiene que restucturar y asociar los index nuevamente.
+-- no conviene indexar todos porque Cuando existen demasiados índices, el optimizador de la base de datos gasta tiempo extra analizando cuál elegir antes de ejecutar la consulta, e incluso puede terminar seleccionando un índice no optimo.
+
+
+
+-- EJERCICIO PRACTICO GUIADO PUNTO 9.
+create index idx_nombre on cliente (nombre);  -- util para cuando se necesite filtrar a un cliente por nombre sin necesidasd de que se recorra toda la tabla.
+
+SELECT cliente_id, nombre, fecha_registro FROM cliente where fecha_registro >= '2025-05-01';
+
+create index idx_ciudad_fecha_registro on cliente (ciudad, fecha_registro); -- va primeron en el orden la ciudad porque es lo que nos interesa saber y despues la fecha para saber de esa ciudad hcae cuanto esta activo el cliente.
+
+SELECT cliente_id, nombre, apellido FROM cliente WHERE ciudad = 'Pereira' AND activo = 1;
+
+CREATE UNIQUE INDEX idx_cliente_correo ON cliente (correo); -- indica que solo puede haber un correo unico por cliente, asi es mas facil filtrar por correo y encontrar el registro exactro.
+
+SELECT correo, COUNT(*) AS cantidad FROM cliente GROUP BY correo HAVING COUNT(*) > 1;
+
